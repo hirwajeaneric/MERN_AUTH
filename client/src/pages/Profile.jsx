@@ -2,18 +2,23 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useEffect, useRef, useState } from 'react';
 import { getDownloadURL, getStorage, ref, uploadBytesResumable } from 'firebase/storage';
 import { app } from '../firebase';
-import { updateUserStart, updateUserSuccess, updateUserFailure } from '../redux/user/userSlice';
+import { updateUserStart, updateUserSuccess, updateUserFailure, deleteUserFailure, deleteUserStart, deleteUserSuccess } from '../redux/user/userSlice';
 
 const Profile = () => {
+  
   const [image, setImage] = useState(undefined);
   const [imageError, setImageError] = useState(false);
   const [imagePercent, setImagePercent] = useState(0);
   const [formData, setFormData] = useState({})
   const [updateSuccess, setupdateSuccess] = useState(false);
+
   const { currentUser, loading, error } = useSelector(state => state.user);
   const dispatch = useDispatch();
+  
   const fileRef = useRef(null);
 
+
+  // HANDLING FILE UPLOADS ----------------------------------------------------------------
   const handleFileUpload = async () => {
     const storage = getStorage(app);
     const fileName = new Date().getTime() + image.name;
@@ -21,7 +26,7 @@ const Profile = () => {
     const uploadTask = uploadBytesResumable(storageRef, image);
 
     uploadTask.on(
-      'state_changed', 
+      'state_changed',
       (snapshot) => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         setImagePercent(Math.round(progress));
@@ -34,7 +39,7 @@ const Profile = () => {
             profilePicture: downloadURL
           }));
       }
-    ); 
+    );
   };
 
 
@@ -45,10 +50,14 @@ const Profile = () => {
   }, [image]);
 
 
+
+  // HANDLE INPUT CHANGES ----------------------------------------------------------------
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
   }
 
+
+  // SAVE / CREATE ----------------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -73,6 +82,26 @@ const Profile = () => {
     }
   }
 
+
+  // DELETE ----------------------------------------------------------------
+  const handleDeleteAccount = async () => {
+    try {
+      const res = await fetch(`/api/user/delete/${currentUser._id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success === false) {
+        dispatch(deleteUserFailure(data));
+        return;
+      }
+      dispatch(deleteUserSuccess(data));
+    } catch (error) {
+      dispatch(deleteUserFailure(error));
+    }
+  }
+
+
+  
   return (
     <div className='p-3 max-w-lg mx-auto'>
       <h1 className="text-3xl font-semibold text-center my-7">Profile</h1>
@@ -103,13 +132,13 @@ const Profile = () => {
         />
         <p className='text-sm self-center'>
           {
-            imageError 
-            ? <span className='text-red-700'>Error uploading image (file size must be less than 2 MB)</span> 
-            : imagePercent > 0 && imagePercent < 100 
-            ? <span className='text-slate-700'>{`Uploading: ${imagePercent} %`}</span> 
-            : imagePercent === 100 
-            ? <span className='text-green-700'>Image uploaded successfully</span> 
-            : ''
+            imageError
+              ? <span className='text-red-700'>Error uploading image (file size must be less than 2 MB)</span>
+              : imagePercent > 0 && imagePercent < 100
+                ? <span className='text-slate-700'>{`Uploading: ${imagePercent} %`}</span>
+                : imagePercent === 100
+                  ? <span className='text-green-700'>Image uploaded successfully</span>
+                  : ''
           }
         </p>
         <input
@@ -141,7 +170,7 @@ const Profile = () => {
         </button>
       </form>
       <div className='flex justify-between mt-5'>
-        <span className='text-red-700 cursor-pointer'>Delete Account</span>
+        <span onClick={handleDeleteAccount} className='text-red-700 cursor-pointer'>Delete Account</span>
         <span className='text-red-700 cursor-pointer'>Sign out</span>
       </div>
       <p className='text-red-700 mt-5'>{error && 'Something went wrong!'}</p>
